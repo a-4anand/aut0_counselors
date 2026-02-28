@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasySkill | AI Career Roadmapper</title>
+
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+
+    <!-- Framer Motion -->
+    <script src="https://unpkg.com/framer-motion@11.1.7/dist/framer-motion.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Marked.js -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- html2pdf for PDF Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], outfit: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        brand: { 500: '#174A84', 600: '#123A68', 50: '#f0f5f9' },
+                        accent: { 500: '#F97316' },
+                        success: { 500: '#32903B' },
+                    },
+                    animation: {
+                        'gradient-x': 'gradient-x 15s ease infinite',
+                        'blob': 'blob 7s infinite',
+                        'shine': 'shine 2s linear infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left center' },
+                            '50%': { 'background-size': '200% 200%', 'background-position': 'right center' }
+                        },
+                        'blob': {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' }
+                        },
+                        'shine': {
+                            '0%': { backgroundPosition: '200% center' },
+                            '100%': { backgroundPosition: '-200% center' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            /* slate-900 */
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            /* IE and Edge */
+            scrollbar-width: none;
+            /* Firefox */
+        }
+
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .glass-input:focus {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(96, 165, 250, 0.5);
+            /* blue-400 */
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.2);
+            outline: none;
+        }
+
+        /* Shine effect for primary button */
+        .btn-shine {
+            background: linear-gradient(90deg,
+                    #174A84 0%,
+                    #2563eb 25%,
+                    #3b82f6 50%,
+                    #2563eb 75%,
+                    #174A84 100%);
+            background-size: 200% auto;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .btn-shine:hover {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Custom PDF Export Styles (Overriding dark mode for print) */
+        .pdf-export-mode {
+            background: white !important;
+            color: #1e293b !important;
+        }
+
+        .pdf-export-mode .glass-panel {
+            background: white !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: none !important;
+            border-top: 5px solid #174A84 !important;
+        }
+
+        .pdf-export-mode h1,
+        .pdf-export-mode h2,
+        .pdf-export-mode h3 {
+            color: #174A84 !important;
+        }
+    </style>
+</head>
+
+{% raw %}
+<body class="antialiased selection:bg-blue-500/30 selection:text-white">
+    <!-- React Root -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { motion, AnimatePresence } = window.Motion;
+
+        // --- COMPONENTS ---
+
+        // 1. Animated Background
+        const AnimatedBackground = () => (
+            <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-slate-950">
+                <div className="absolute top-0 left-[-10%] w-96 h-96 bg-blue-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob" />
+                <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-indigo-600/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000" />
+                <div className="absolute bottom-[-10%] left-[20%] w-[500px] h-[500px] bg-sky-600/20 rounded-full mix-blend-screen filter blur-[120px] animate-blob animation-delay-4000" />
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] opacity-20 mask-image:linear-gradient(to_bottom,white,transparent)"></div>
+            </div>
+        );
+
+        // 2. Custom 3-Segment Date of Birth Input
+        const DobInput = ({ value, onChange }) => {
+            const [localDob, setLocalDob] = useState({ dd: '', mm: '', yyyy: '' });
+            const ddRef = useRef(null);
+            const mmRef = useRef(null);
+            const yyyyRef = useRef(null);
+
+            useEffect(() => {
+                if (value) {
+                    const date = new Date(value);
+                    if (!isNaN(date.getTime())) {
+                        setLocalDob({
+                            dd: String(date.getDate()).padStart(2, '0'),
+                            mm: String(date.getMonth() + 1).padStart(2, '0'),
+                            yyyy: String(date.getFullYear())
+                        });
+                    }
+                }
+            }, [value]);
+
+            const handleChange = (e, field) => {
+                let val = e.target.value.replace(/\D/g, ''); // Numbers only
+
+                if (field === 'dd' && val.length > 2) val = val.slice(0, 2);
+                if (field === 'mm' && val.length > 2) val = val.slice(0, 2);
+                if (field === 'yyyy' && val.length > 4) val = val.slice(0, 4);
+
+                const newDob = { ...localDob, [field]: val };
+                setLocalDob(newDob);
+
+                // Auto-advance logic
+                if (field === 'dd' && val.length === 2) mmRef.current.focus();
+                if (field === 'mm' && val.length === 2) yyyyRef.current.focus();
+
+                // Build date string if complete enough for backend
+                if (newDob.dd.length === 2 && newDob.mm.length === 2 && newDob.yyyy.length === 4) {
+                    onChange(`${newDob.yyyy}-${newDob.mm}-${newDob.dd}`);
+                } else {
+                    onChange(''); // Incomplete
+                }
+            };
+
+            const handleKeyDown = (e, field) => {
+                if (e.key === 'Backspace' && !localDob[field]) {
+                    if (field === 'mm') ddRef.current.focus();
+                    if (field === 'yyyy') mmRef.current.focus();
+                }
+            };
+
+            return (
+                <div className="flex gap-3">
+                    <input
+                        ref={ddRef}
+                        type="text"
+                        placeholder="DD"
+                        value={localDob.dd}
+                        onChange={(e) => handleChange(e, 'dd')}
+                        onKeyDown={(e) => handleKeyDown(e, 'dd')}
+                        className="glass-input w-20 text-center rounded-xl p-4 text-lg"
+                    />
+                    <span className="text-gray-400 flex items-center text-xl">/</span>
+                    <input
+                        ref={mmRef}
+                        type="text"
+                        placeholder="MM"
+                        value={localDob.mm}
+                        onChange={(e) => handleChange(e, 'mm')}
+                        onKeyDown={(e) => handleKeyDown(e, 'mm')}
+                        className="glass-input w-20 text-center rounded-xl p-4 text-lg"
+                    />
+                    <span className="text-gray-400 flex items-center text-xl">/</span>
+                    <input
+                        ref={yyyyRef}
+                        type="text"
+                        placeholder="YYYY"
+                        value={localDob.yyyy}
+                        onChange={(e) => handleChange(e, 'yyyy')}
+                        onKeyDown={(e) => handleKeyDown(e, 'yyyy')}
+                        className="glass-input flex-1 text-center rounded-xl p-4 text-lg tracking-widest"
+                    />
+                </div>
+            );
+        };
+
+        // 3. Segmented Control Pills
+        const SegmentedControl = ({ options, value, onChange }) => {
+            return (
+                <div className="flex flex-wrap gap-3 p-1 rounded-2xl glass-input w-max max-w-full">
+                    {options.map((opt) => (
+                        <button
+                            key={opt}
+                            type="button"
+                            onClick={() => onChange(opt)}
+                            className={`relative px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${value === opt ? 'text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                                }`}
+                        >
+                            {value === opt && (
+                                <motion.div
+                                    layoutId="activePill"
+                                    className="absolute inset-0 bg-blue-500 rounded-xl"
+                                    transition={JSON.parse('{"type":"spring","stiffness":300,"damping":30}')}
+                                />
+                            )}
+                            <span className="relative z-10">{opt}</span>
+                        </button>
+                    ))}
+                </div>
+            );
+        };
+
+        // 4. Floating Label Input
+        const FloatingInput = ({ label, value, onChange, required = false }) => {
+            const [isFocused, setIsFocused] = useState(false);
+            const active = isFocused || value.length > 0;
+
+            return (
+                <div className="relative">
+                    <motion.label
+                        initial={false}
+                        animate={{
+                            top: active ? '-0.5rem' : '1rem',
+                            left: '1rem',
+                            fontSize: active ? '0.75rem' : '1rem',
+                            color: active ? '#60A5FA' : '#9CA3AF',
+                        }}
+                        className="absolute pointer-events-none bg-slate-900/50 backdrop-blur px-1 rounded transition-colors"
+                    >
+                        {label} {required && <span className="text-red-400">*</span>}
+                    </motion.label>
+                    <input
+                        type="text"
+                        value={value}
+                        onChange={e => onChange(e.target.value)}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        required={required}
+                        className="glass-input w-full rounded-2xl p-4 pt-5 text-gray-100"
+                    />
+                </div>
+            );
+        };
+
+        // --- VIEWS ---
+
+        const OnboardingView = ({ userData, setUserData, onNext }) => {
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!userData.age) {
+                    alert('Please enter a valid complete Date of Birth.');
+                    return;
+                }
+                onNext();
+            };
+
+            const calculateAge = (dobStr) => {
+                if (!dobStr) return null;
+                const dob = new Date(dobStr);
+                const diffMs = Date.now() - dob.getTime();
+                const ageDate = new Date(diffMs);
+                return Math.abs(ageDate.getUTCFullYear() - 1970);
+            };
+
+            return (
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="glass-panel p-8 md:p-12 rounded-[2rem] max-w-2xl mx-auto w-full border-t border-t-blue-500/50"
+                >
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black p-2 px-4 rounded-lg text-xs tracking-widest uppercase shadow-lg shadow-blue-500/20">
+                            EasySkill AI
+                        </div>
+                    </div>
+
+                    <h1 className="text-4xl md:text-5xl font-extrabold mb-4 font-outfit text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tight">
+                        Create Your Roadmap
+                    </h1>
+                    <p className="text-gray-400 mb-10 text-lg">Initialize your profile for the AI consultation.</p>
+
+                    <form onSubmit={handleSubmit} className="space-y-8">
+
+                        <FloatingInput
+                            label="Full Name"
+                            value={userData.name}
+                            onChange={v => setUserData({ ...userData, name: v })}
+                            required
+                        />
+
+                        <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-400 ml-1">Date of Birth</label>
+                            <DobInput
+                                value={userData.dobStr || ''}
+                                onChange={(val) => setUserData({ ...userData, dobStr: val, age: calculateAge(val) })}
+                            />
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-400 ml-1">Gender</label>
+                            <SegmentedControl
+                                options={['Male', 'Female', 'Other']}
+                                value={userData.gender}
+                                onChange={v => setUserData({ ...userData, gender: v })}
+                            />
+                        </div>
+
+                        <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-400 ml-1">Language Setup</label>
+                            <SegmentedControl
+                                options={['English', 'Hindi', 'Gujarati']}
+                                value={userData.language || 'English'}
+                                onChange={v => setUserData({ ...userData, language: v })}
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="w-full btn-shine animate-shine font-bold py-5 text-lg rounded-2xl shadow-xl shadow-blue-500/20 mt-8 uppercase tracking-widest flex items-center justify-center gap-3 relative overflow-hidden group"
+                        >
+                            <span className="relative z-10 flex items-center gap-2">
+                                <i data-lucide="sparkles" className="w-5 h-5"></i>
+                                Initialize AI Module
+                            </span>
+                            <div className="absolute inset-0 bg-white/20 transform -skew-x-12 translate-x-[-150%] group-hover:translate-x-[150%] transition-transform duration-700 ease-in-out" />
+                        </button>
+                    </form>
+                </motion.div>
+            );
+        };
+
+        const SurveyView = ({ userData, setUserData, onComplete }) => {
+            const [loading, setLoading] = useState(true);
+            const [currentQ, setCurrentQ] = useState(null);
+            const MAX_QUESTIONS = 15;
+
+            useEffect(() => {
+                fetchNextQuestion();
+            }, []);
+
+            const fetchNextQuestion = async () => {
+                if (userData.history.length >= MAX_QUESTIONS) {
+                    return onComplete();
+                }
+
+                setLoading(true);
+                try {
+                    const response = await fetch('/api/next_question', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userData)
+                    });
+
+                    if (!response.ok) throw new Error('API Error');
+                    const data = await response.json();
+
+                    if (data.question && data.question.includes("ASSESSMENT_COMPLETE")) {
+                        return onComplete();
+                    }
+
+                    setCurrentQ(data);
+                } catch (err) {
+                    console.error(err);
+                    alert("Connection unstable. Retrying...");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleAnswer = (answer) => {
+                setUserData(prev => ({
+                    ...prev,
+                    history: [...prev.history, { question: currentQ.question, answer }]
+                }));
+                fetchNextQuestion();
+            };
+
+            return (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.5 }}
+                    className="glass-panel p-8 md:p-12 rounded-[2rem] max-w-3xl mx-auto w-full mt-10"
+                >
+                    <AnimatePresence mode="wait">
+                        {loading ? (
+                            <motion.div
+                                key="loader"
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="flex flex-col items-center justify-center py-20"
+                            >
+                                <div className="relative w-20 h-20">
+                                    <div className="absolute inset-0 rounded-full border-4 border-slate-700"></div>
+                                    <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <i data-lucide="brain" className="w-8 h-8 text-blue-400 animate-pulse"></i>
+                                    </div>
+                                </div>
+                                <p className="mt-8 text-blue-400 font-medium tracking-widest uppercase text-sm animate-pulse">
+                                    Processing Neural Pathways...
+                                </p>
+                            </motion.div>
+                        ) : currentQ ? (
+                            <motion.div
+                                key="content"
+                                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                                className="text-left"
+                            >
+                                <div className="flex items-center gap-3 mb-8">
+                                    <div className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></div>
+                                    <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                                        Module {userData.history.length + 1}
+                                    </span>
+                                </div>
+
+                                <h2 className="text-2xl md:text-4xl font-outfit font-bold text-white mb-10 leading-tight">
+                                    {currentQ.question}
+                                </h2>
+
+                                <div className="flex flex-col gap-4">
+                                    {currentQ.options.map((opt, i) => (
+                                        <motion.button
+                                            key={i}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: i * 0.1 }}
+                                            onClick={() => handleAnswer(opt)}
+                                            className="glass-input w-full text-left p-6 rounded-2xl text-lg hover:bg-white/10 hover:border-blue-500/50 transition-all flex justify-between items-center group cursor-pointer"
+                                        >
+                                            <span className="font-medium">{opt}</span>
+                                            <i data-lucide="arrow-right" className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-1 transition-all"></i>
+                                        </motion.button>
+                                    ))}
+
+                                    <div className="flex gap-4 mt-4">
+                                        {['Other', 'Skip'].map((opt, i) => (
+                                            <motion.button
+                                                key={opt}
+                                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 + (i * 0.1) }}
+                                                onClick={() => handleAnswer(opt)}
+                                                className="flex-1 glass-input bg-transparent border-dashed border-slate-600 text-slate-400 p-4 rounded-xl text-sm font-medium hover:border-blue-500/50 hover:text-blue-400 transition-colors text-center"
+                                            >
+                                                {opt}
+                                            </motion.button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ) : null}
+                    </AnimatePresence>
+                </motion.div>
+            );
+        };
+
+        const ReportView = ({ userData }) => {
+            const [reportHtml, setReportHtml] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                generateFinalReport();
+            }, []);
+
+            const generateFinalReport = async () => {
+                setLoading(true);
+                try {
+                    const response = await fetch('/api/generate_report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userData)
+                    });
+
+                    if (!response.ok) throw new Error('API Error');
+                    const data = await response.json();
+
+                    const cleanHTML = data.report
+                        .replace(/```html\\n?/gi, '')
+                        .replace(/```\\n?/gi, '');
+
+                    setReportHtml(cleanHTML);
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const handleDownload = () => {
+                const element = document.getElementById('pdfExportWrapper');
+
+                // Temporarily add class to force white background for PDF
+                element.classList.add('pdf-export-mode');
+
+                const opt = {
+                    margin: 0.5,
+                    filename: 'EasySkill_Executive_Roadmap.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+
+                html2pdf().set(opt).from(element).save().then(() => {
+                    element.classList.remove('pdf-export-mode');
+                });
+            };
+
+            if (loading) return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-8">
+                    <div className="w-full max-w-md">
+                        <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden mb-8">
+                            <motion.div
+                                className="h-full bg-blue-500"
+                                initial={{ width: "0%" }}
+                                animate={{ width: "100%" }}
+                                transition={{ duration: 15, ease: "linear" }}
+                            />
+                        </div>
+                        <p className="text-center font-mono text-slate-400 text-sm">Synthesizing Executive Architecture...</p>
+                    </div>
+                </div>
+            );
+
+            return (
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-4xl mx-auto py-12 px-4 w-full"
+                >
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+                        <div>
+                            <h2 className="text-3xl font-outfit font-bold text-white">Execution Plan Ready</h2>
+                            <p className="text-slate-400 mt-1">Generated specifically for {userData.name}</p>
+                        </div>
+                        <button
+                            onClick={handleDownload}
+                            className="btn-shine px-6 py-3 rounded-xl font-bold tracking-wide flex items-center gap-2 text-sm shadow-lg shadow-blue-500/20"
+                        >
+                            <i data-lucide="download" className="w-4 h-4"></i>
+                            Export to PDF
+                        </button>
+                    </div>
+
+                    <div id="pdfExportWrapper" className="glass-panel p-10 md:p-14 rounded-3xl relative overflow-hidden">
+                        {/* Decorative glow inside report */}
+                        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full mix-blend-screen filter blur-[100px] pointer-events-none" />
+
+                        <div
+                            className="prose prose-invert prose-lg max-w-none prose-headings:font-outfit prose-headings:text-blue-400 prose-a:text-blue-400 relative z-10"
+                            dangerouslySetInnerHTML={{ __html: reportHtml }}
+{% endraw %}
+                        />
+                    </div>
+
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="mt-12 w-full glass-input hover:bg-white/5 py-4 rounded-2xl font-semibold text-slate-300 transition-colors"
+                    >
+                        Initialize New Session
+                    </button>
+                </motion.div>
+            );
+        };
+
+        // --- MAIN APP ---
+        const App = () => {
+            const [view, setView] = useState('onboarding'); // 'onboarding', 'survey', 'report'
+            const [userData, setUserData] = useState({
+                name: '',
+                gender: 'Male',
+                language: 'English',
+                history: [],
+                age: null,
+                dobStr: ''
+            });
+
+            // Re-initialize Lucide icons when view changes
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }, [view]);
+
+            return (
+                <>
+                    <AnimatedBackground />
+                    <main className="min-h-screen flex items-center justify-center p-4">
+                        <AnimatePresence mode="wait">
+                            {view === 'onboarding' && (
+                                <OnboardingView
+                                    userData={userData}
+                                    setUserData={setUserData}
+                                    onNext={() => setView('survey')}
+                                    key="onboarding"
+                                />
+                            )}
+                            {view === 'survey' && (
+                                <SurveyView
+                                    userData={userData}
+                                    setUserData={setUserData}
+                                    onComplete={() => setView('report')}
+                                    key="survey"
+                                />
+                            )}
+                            {view === 'report' && (
+                                <ReportView
+                                    userData={userData}
+                                    key="report"
+                                />
+                            )}
+                        </AnimatePresence>
+                    </main>
+                </>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
